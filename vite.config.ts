@@ -1,6 +1,11 @@
-import { vitePlugin as remix } from "@remix-run/dev";
+import {
+  vitePlugin as remix,
+  cloudflareDevProxyVitePlugin as remixCloudflareDevProxy,
+} from "@remix-run/dev";
 import { defineConfig, type UserConfig } from "vite";
 import tsconfigPaths from "vite-tsconfig-paths";
+import { D1SessionStorage } from "./app/d1-session-storage";
+import getShopifyInstance from "./app/shopify.server";
 
 // Related: https://github.com/remix-run/remix/issues/2835#issuecomment-1144102176
 // Replace the HOST env var with SHOPIFY_APP_URL so that it doesn't break the remix server. The CLI will eventually
@@ -44,6 +49,25 @@ export default defineConfig({
     },
   },
   plugins: [
+    remixCloudflareDevProxy({
+      getLoadContext: ({ request, context }) => {
+        const env = context.cloudflare.env as Env;
+        if (!env.SHOPIFY_APP_URL) {
+          env.SHOPIFY_APP_URL = request.url;
+        }
+        const db = new D1SessionStorage(env.DB);
+        const shopify = getShopifyInstance(env, db);
+        return {
+          ...context,
+          cloudflare: {
+            ...context.cloudflare,
+            env,
+          },
+          db,
+          shopify,
+        }
+      },
+    }),
     remix({
       ignoredRouteFiles: ["**/.*"],
     }),

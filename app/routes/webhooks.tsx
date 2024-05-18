@@ -1,9 +1,7 @@
-import type { ActionFunctionArgs } from "@remix-run/node";
-import { authenticate } from "../shopify.server";
-import db from "../db.server";
+import type { ActionFunctionArgs } from "@remix-run/cloudflare";
 
-export const action = async ({ request }: ActionFunctionArgs) => {
-  const { topic, shop, session, admin } = await authenticate.webhook(request);
+export const action = async ({ request, context }: ActionFunctionArgs) => {
+  const { topic, shop, session, admin } = await context.shopify.authenticate.webhook(request);
 
   if (!admin) {
     // The admin context isn't returned if the webhook fired after a shop was uninstalled.
@@ -13,7 +11,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   switch (topic) {
     case "APP_UNINSTALLED":
       if (session) {
-        await db.session.deleteMany({ where: { shop } });
+        await context.db.deleteSessionsByShop(shop);
       }
 
       break;
